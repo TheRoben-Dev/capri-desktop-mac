@@ -37,5 +37,8 @@ contextBridge.exposeInMainWorld('host', {
   openApps: () => ipcRenderer.invoke('apps:list'),
   findApp: (wanted) => ipcRenderer.invoke('apps:find', wanted),
   closeApp: (name, force) => ipcRenderer.invoke('apps:close', { name, force: Boolean(force) }),
+  listActions: () => ipcRenderer.invoke('actions:list'),
+  findAction: (kind, wanted) => ipcRenderer.invoke('actions:find', { kind, wanted }),
+  runAction: (kind, name) => ipcRenderer.invoke('actions:run', { kind, name }),
   focusOverlay: (on) => ipcRenderer.send('overlay:focus', Boolean(on)),
 });

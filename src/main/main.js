@@ -14,6 +14,7 @@ const { createBridge } = require('./bridge');
 const { startWindowWatch } = require('./windows');
 const ollama = require('./ollama');
 const apps = require('./apps');
+const actions = require('./actions');
 const hooks = require('../../scripts/install-hooks');
 const demoSteps = require('../../scripts/demo-sequence');
 
@@ -365,6 +366,10 @@ function registerIpc() {
   ipcMain.handle('apps:list', async () => (await apps.list().catch(() => [])).map(appInfo));
   ipcMain.handle('apps:find', async (_e, wanted) => appInfo(await apps.find(wanted).catch(() => null)));
   ipcMain.handle('apps:close', (_e, { name, force }) => apps.close(name, { force }).catch((err) => ({ error: err.message })));
+  // the rest of what she can do when you ask her (actions.js): open an app, run a Shortcut, music and volume
+  ipcMain.handle('actions:list', () => actions.available().catch(() => ({ open: [], shortcut: [], media: [] })));
+  ipcMain.handle('actions:find', (_e, { kind, wanted }) => actions.find(kind, wanted).catch(() => null));
+  ipcMain.handle('actions:run', (_e, { kind, name }) => actions.perform(kind, name));
   // typing to her: the overlay takes the keyboard while the chat is open, and gives it back after
   ipcMain.on('overlay:focus', (_e, on) => {
     if (!overlay) return;

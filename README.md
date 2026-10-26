@@ -130,10 +130,16 @@ what Claude is doing and what it got done today. She answers in writing, in her 
 **It's AI.** Her replies are written by the model, not by the show's writers: it's a fan version of her, and the chat
 panel says so every time.
 
-**Closing an app** (Windows): ask her ("close AM Music", "can you shut Discord down?") and she offers a button with the
+**Closing an app** (Windows and macOS): ask her ("close AM Music", "can you shut Discord down?") and she offers a button with the
 app's name. Nothing happens until you click it. She closes it the way its own close button does, so it can still ask
 you to save. If it only hid in the tray, she offers **Force quit**, again only on your click (unsaved work is lost
-then). She never closes Windows' own pieces, Claude, Ollama or herself, and she can't do anything else on your PC.
+then). She never closes the system's own pieces, Claude, Ollama or herself.
+
+**Opening apps, Shortcuts, music**: ask her to open an installed app ("open Spotify"), to run one of your Shortcuts
+(macOS: "run Lights off"), or to play, pause, skip or change the volume ("turn it down", "volume 30" on macOS). Same
+deal: she offers a button, and only your click does it. She only picks from what's really installed (and your
+Shortcuts list), never a command of her own. On macOS, the first time she controls Music or Spotify, macOS asks
+whether Capri may. Apart from that, she can't do anything else on your computer.
 
 She only catches the mouse on her actual body (pixel-precise): the rest of the screen works as usual.
 
@@ -355,6 +361,8 @@ src/main/                Electron: full-screen transparent click-through window,
   windows.js / .ps1      where the other windows are (Windows only), so she can sit on them
   ollama.js              her chat: the local model, through Ollama
   apps.js                closing an app you asked her to close (after your click)
+  actions.js             opening an app, running a Shortcut, music and volume (after your click)
+  mac-helper.js          where the Swift helper is (native/mac-helper: windows and apps on macOS)
 src/renderer/js/
   sprite.js              WebGL shader: head tilt, mane flare, sitting, smears, afterimages, colors, glitch
   acting.js              the exposure sheets: every move, drawing by drawing

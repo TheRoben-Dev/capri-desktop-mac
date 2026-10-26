@@ -74,6 +74,17 @@ export const LINES = {
       forced: '{app} : coupé net.',
       unkillable: '{app} résiste. Ferme-le toi-même depuis le Gestionnaire des tâches.',
       notFound: 'Je ne vois pas « {app} » ouvert sur ton PC.',
+      // ouvrir une app, lancer un raccourci, la musique et le volume, après ton clic
+      openIt: 'Ouvrir {app}', opened: '{app} : en ligne.',
+      runIt: 'Lancer « {name} »', ran: '« {name} » : exécuté.',
+      media: {
+        play: 'Lecture', pause: 'Pause', next: 'Morceau suivant', previous: 'Morceau précédent',
+        'volume up': 'Monter le son', 'volume down': 'Baisser le son', mute: 'Couper le son', unmute: 'Remettre le son',
+        volume: 'Volume à {n} %',
+      },
+      mediaDone: 'C’est fait.',
+      noPlayer: 'Aucun lecteur ouvert. Lance Musique ou Spotify d’abord.',
+      noSuch: 'Je ne trouve pas « {name} » ici.',
     },
     // sa carte de rapport : ce que Claude a abattu aujourd'hui (son menu, ou d'elle-même le soir)
     report: {
@@ -229,6 +240,17 @@ export const LINES = {
       forced: '{app}: cut off clean.',
       unkillable: '{app} won’t go down. Close it yourself from Task Manager.',
       notFound: 'I don’t see “{app}” open on your PC.',
+      // opening an app, running a Shortcut, the music and volume, after your click
+      openIt: 'Open {app}', opened: '{app}: online.',
+      runIt: 'Run “{name}”', ran: '“{name}”: executed.',
+      media: {
+        play: 'Play', pause: 'Pause', next: 'Next track', previous: 'Previous track',
+        'volume up': 'Volume up', 'volume down': 'Volume down', mute: 'Mute', unmute: 'Unmute',
+        volume: 'Volume to {n}%',
+      },
+      mediaDone: 'Done.',
+      noPlayer: 'No player open. Start Music or Spotify first.',
+      noSuch: 'I can’t find “{name}” here.',
     },
     // her report card: what Claude got through today (her menu, or on her own in the evening)
     report: {
@@ -383,6 +405,17 @@ export const LINES = {
       forced: '{app}: cortada en seco.',
       unkillable: '{app} se resiste. Ciérrala tú desde el Administrador de tareas.',
       notFound: 'No veo «{app}» abierta en tu PC.',
+      // abrir una app, ejecutar un atajo, la música y el volumen, tras tu clic
+      openIt: 'Abrir {app}', opened: '{app}: en línea.',
+      runIt: 'Ejecutar «{name}»', ran: '«{name}»: ejecutado.',
+      media: {
+        play: 'Reproducir', pause: 'Pausa', next: 'Siguiente', previous: 'Anterior',
+        'volume up': 'Subir volumen', 'volume down': 'Bajar volumen', mute: 'Silenciar', unmute: 'Quitar silencio',
+        volume: 'Volumen al {n} %',
+      },
+      mediaDone: 'Hecho.',
+      noPlayer: 'No hay ningún reproductor abierto. Abre Música o Spotify primero.',
+      noSuch: 'No encuentro «{name}» aquí.',
     },
     // su informe: lo que Claude sacó hoy (su menú, o ella sola por la tarde)
     report: {
@@ -536,6 +569,17 @@ export const LINES = {
       forced: '{app}: cortado na hora.',
       unkillable: '{app} não cai. Feche você mesmo pelo Gerenciador de Tarefas.',
       notFound: 'Não vejo “{app}” aberto no seu PC.',
+      // abrir um app, rodar um atalho, a música e o volume, depois do seu clique
+      openIt: 'Abrir {app}', opened: '{app}: online.',
+      runIt: 'Rodar “{name}”', ran: '“{name}”: executado.',
+      media: {
+        play: 'Tocar', pause: 'Pausar', next: 'Próxima', previous: 'Anterior',
+        'volume up': 'Aumentar volume', 'volume down': 'Diminuir volume', mute: 'Silenciar', unmute: 'Tirar do mudo',
+        volume: 'Volume em {n}%',
+      },
+      mediaDone: 'Feito.',
+      noPlayer: 'Nenhum player aberto. Abra o Música ou o Spotify primeiro.',
+      noSuch: 'Não acho “{name}” aqui.',
     },
     // o relatório dela: o que o Claude fez hoje (o menu dela, ou sozinha à noite)
     report: {
@@ -689,6 +733,17 @@ export const LINES = {
       forced: '{app}: отрублено.',
       unkillable: '{app} не сдаётся. Закрой через Диспетчер задач.',
       notFound: 'Не вижу «{app}» среди открытых на твоём ПК.',
+      // открыть приложение, запустить быструю команду, музыка и громкость, после твоего клика
+      openIt: 'Открыть {app}', opened: '{app}: в сети.',
+      runIt: 'Запустить «{name}»', ran: '«{name}»: выполнено.',
+      media: {
+        play: 'Играть', pause: 'Пауза', next: 'Следующий трек', previous: 'Предыдущий трек',
+        'volume up': 'Громче', 'volume down': 'Тише', mute: 'Выключить звук', unmute: 'Включить звук',
+        volume: 'Громкость {n}%',
+      },
+      mediaDone: 'Готово.',
+      noPlayer: 'Плеер не открыт. Сначала запусти Музыку или Spotify.',
+      noSuch: 'Не нахожу «{name}» здесь.',
     },
     // её отчёт: что Claude сделал за день (её меню, или сама вечером)
     report: {
@@ -813,6 +868,15 @@ const MAC_ICON = {
   },
 };
 
+// and on a Mac, force quitting is done from Activity Monitor
+const MAC_UNKILLABLE = {
+  fr: '{app} résiste. Ferme-le toi-même depuis le Moniteur d’activité.',
+  en: '{app} won’t go down. Close it yourself from Activity Monitor.',
+  es: '{app} se resiste. Ciérrala tú desde el Monitor de Actividad.',
+  pt: '{app} não cai. Feche você mesmo pelo Monitor de Atividade.',
+  ru: '{app} не сдаётся. Закрой через Мониторинг системы.',
+};
+
 function forMac(value) {
   if (typeof value === 'string') return value.replaceAll('Ctrl+Alt+C', '⌃⌥C').replace(/\bPC\b|ПК/g, 'Mac');
   if (Array.isArray(value)) return value.map(forMac);
@@ -826,5 +890,6 @@ if (/Mac/.test(navigator.platform)) {
   for (const [lang, lines] of Object.entries(LINES)) {
     LINES[lang] = forMac(lines);
     Object.assign(LINES[lang].guide.icon, MAC_ICON[lang]);
+    LINES[lang].chat.unkillable = MAC_UNKILLABLE[lang];
   }
 }

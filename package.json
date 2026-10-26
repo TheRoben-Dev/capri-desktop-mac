@@ -1,6 +1,6 @@
 {
   "name": "capri-desktop",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Capri, the Project Capricorn construct, living on your desktop and narrating what Claude Code is doing.",
   "author": "mochiiwuff",
   "repository": "github:mochiiwuff/capri-desktop",
@@ -75,7 +75,8 @@
       "icon": "assets/icons/capri-mac.png",
       "category": "public.app-category.entertainment",
       "extendInfo": {
-        "LSUIElement": true
+        "LSUIElement": true,
+        "NSAppleEventsUsageDescription": "Capri plays, pauses and skips your music in Music or Spotify when you ask her to."
       },
       "extraResources": [
         {
@@ -84,7 +85,9 @@
         }
       ],
       "x64ArchFiles": "Contents/Resources/bin/*",
-      "artifactName": "Capri-${version}-mac.${ext}"
+      "artifactName": "Capri-${version}-mac.${ext}",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "nsis": {
       "oneClick": true,
