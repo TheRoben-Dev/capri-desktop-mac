@@ -16,6 +16,9 @@ const DEFAULTS = {
   welcomed: false,   // she has introduced herself (her welcome panel)
   linked: false,     // a Claude Code event has reached her at least once
   chatModel: null,   // the Ollama model she talks with (null: the first one installed)
+  webSearch: true,   // she may look things up on the web for her chat (search.js)
+  braveKey: '',      // a Brave Search API key: searches go there instead of DuckDuckGo
+  searxngUrl: '',    // or a SearXNG instance (https://…), with format=json allowed
 };
 
 let cache = null;
@@ -34,6 +37,17 @@ function load() {
   return cache;
 }
 
+// Picks up what you changed in the file yourself (her search settings); a file that doesn't parse
+// (yet) is left alone.
+function refresh() {
+  try {
+    cache = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(file(), 'utf8')) };
+  } catch {
+    load();
+  }
+  return cache;
+}
+
 function save(patch) {
   cache = { ...load(), ...patch };
   try {
@@ -45,4 +59,4 @@ function save(patch) {
   return cache;
 }
 
-module.exports = { load, save, DEFAULTS };
+module.exports = { load, save, refresh, file, DEFAULTS };

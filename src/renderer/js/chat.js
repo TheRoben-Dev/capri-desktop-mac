@@ -30,6 +30,8 @@ const MEDIA_ASK = [
   ['previous', /\b(previous|last) (song|track)|pr[ée]c[ée]dent|anterior|предыдущ/i],
   ['play', /\b(play|resume)\b.*\b(music|song|spotify)|^\s*(play|resume)\b|joue|remets la musique|reprend|reproduc|\btoca|включи музык/i],
 ];
+// "search for", "look up", "google", "recherche", "busca", "pesquisa", "найди в интернете"... then what
+const SEARCH_ASK = /(?:\b(?:search(?: the web| online| the internet| google)?(?: for)?|look up|google|web search)|\brecherche(?:r)?(?: sur (?:internet|le web|google))?|\bcherche(?:r)? sur (?:internet|le web|google)|\bbusca(?:r)?(?: en (?:internet|la web|google))?|\bpesquis\w*(?: na (?:internet|web))?|(?:найди|поищи|загугли)(?: в интернете)?)\s*:?\s+(.{2,})/i;
 const VOLUME_ASK = /(volume|vol\b|son\b|sonido|som\b|громкост)\D{0,15}?(\d{1,3})\s*%?|(\d{1,3})\s*%?\s*(de |of )?(volume|громкост)/i;
 
 export class Chat {
@@ -46,7 +48,10 @@ export class Chat {
     this.apps = [];    // the apps open on this PC, as last listed: [{ name, label }]
     this.actions = { open: [], shortcut: [], media: [], volume: false }; // the rest she can do here (actions.js)
     this.appsReady = Promise.resolve();
+    this.searchOn = false; // she may look things up on the web (her menu)
+    this.searching = '';   // "Searching the net: …" above her answer, while it's one from a search
     host.onChatDelta(({ id, text }) => this.onDelta(id, text));
+    host.onChatSearch(({ id, query }) => this.onSearch(id, query));
   }
 
   get t() {
@@ -86,6 +91,7 @@ export class Chat {
       });
       return;
     }
+    this.searchOn = Boolean(status.search);
     this.listApps();
     host.focusOverlay(true); // the keyboard, for typing to her
     const shown = this.panel.say({
@@ -130,6 +136,7 @@ export class Chat {
     const id = Date.now();
     this.turn = id;
     this.answer = '';
+    this.searching = '';
     this.history.push({ role: 'user', content: text });
     this.panel.setChatBusy(true);
     this.panel.setActions([]); // a close button she offered before goes with a new message
@@ -141,7 +148,8 @@ export class Chat {
     const slow = setTimeout(() => {
       if (this.turn === id && !this.answer) this.panel.stream(this.t.loading);
     }, LOADING_AFTER_MS);
-    const res = await this.host.chatSend({ id, messages });
+    const search = this.searchOn ? this.askedToSearch(text) : null;
+    const res = await this.host.chatSend({ id, messages, search });
     clearTimeout(slow);
     if (this.turn !== id) {
       // closed meanwhile: your message goes too, or the next answer would answer it as well
@@ -158,9 +166,15 @@ export class Chat {
     }
     const answer = clean(res.text) || '…';
     this.history.push({ role: 'assistant', content: answer });
-    this.panel.stream(answer, { done: true });
+    this.panel.stream(this.withSearch(answer), { done: true });
     this.panel.setFace(mood(answer));
     this.panel.setChatBusy(false);
+    // an answer from the web: its sources as buttons, and nothing to click to do on the computer
+    if (res.sources) {
+      this.offerSources(res.sources);
+      this.listApps();
+      return;
+    }
     // what you asked for first (a small model doesn't always write its tag right), else its tag
     // ("raise the volume" with a [[close: Music]] from the model is the volume)
     const wanted = this.askedToClose(text);
@@ -192,6 +206,41 @@ export class Chat {
       }
     }
     return best?.app.name || null;
+  }
+
+  // "search for the Warframe patch notes": what to look up, when you ask for a search in so many words.
+  askedToSearch(text) {
+    const query = SEARCH_ASK.exec(text)?.[1].replace(/\b(please|pls|plz|for me|stp|por favor|пожалуйста)\b|[?!]+$/gi, ' ').trim();
+    return query && query.length >= 2 ? query : null;
+  }
+
+  onSearch(id, query) {
+    if (id !== this.turn) return;
+    this.searching = fmt(this.t.searching, { q: query });
+    this.answer = ''; // what she said before searching makes way for the answer from it
+    this.panel.stream(this.searching);
+  }
+
+  withSearch(text) {
+    return this.searching ? `${this.searching}\n\n${text}` : text;
+  }
+
+  // Up to three buttons, one per page her answer came from (it opens in your browser).
+  offerSources(sources) {
+    if (!this.open || this.turn || !sources.length) return;
+    const site = (url) => {
+      try {
+        return new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        return url;
+      }
+    };
+    const sites = new Set();
+    const list = sources.filter((s) => !sites.has(site(s.url)) && sites.add(site(s.url))).slice(0, 3); // one per site
+    this.panel.setActions(
+      list.map((s, i) => ({ id: String(i), label: `↗ ${site(s.url)}`, primary: i === 0 })),
+      (i) => this.host.openSource(list[Number(i)]?.url),
+    );
   }
 
   // Your message asks for the music, the volume, an app or a Shortcut in so many words: { kind, name }.
@@ -309,19 +358,23 @@ export class Chat {
       const level = volume ? ', or volume N to set it to N percent, like [[media: volume 30]]' : '';
       can.push(`Control the music and the volume: [[media: WHAT]], WHAT one of: ${media.join(', ')}${level}.`);
     }
-    if (!can.length) return [`You can't do anything on the user's computer here, and ${cant}`];
+    const web = this.searchOn
+      ? ['You can look things up on the web: for news, prices, release dates, scores or anything current, or that you don\'t know for sure, end your answer with [[search: A FEW KEYWORDS]] and nothing after it. You get the results right after, then answer from them. Never make up current facts.']
+      : ['You can\'t look things up on the web (it\'s off in your menu): for anything current, say you can\'t check.'];
+    if (!can.length) return [`You can't do anything on the user's computer here, and ${cant}`, ...web];
     return [
       'What you can do on the user\'s computer, only when they ask you to:',
       ...can,
       'Then say in a few words that you\'re about to (like "One click and Safari\'s up, choom."), and you MUST end your answer with that [[...]] itself, nothing after it: without it, nothing happens. They still have to click a button, so it hasn\'t happened yet: never say it\'s done, paused, set or opened.',
       `Apart from that, ${cant}`,
+      ...web,
     ];
   }
 
   onDelta(id, piece) {
     if (id !== this.turn) return;
     this.answer += piece;
-    this.panel.stream(clean(this.answer));
+    this.panel.stream(this.withSearch(clean(this.answer)));
     this.voice.play('blip'); // her blips as the words come in
   }
 

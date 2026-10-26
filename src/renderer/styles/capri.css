@@ -637,6 +637,7 @@ body {
 
 .panel.is-chat .panel__line {
   max-height: min(36vh, 320px);
+  white-space: pre-line; /* "Searching the net: …" on its own line above her answer */
   padding-block: 2px; /* the display face's glyphs reach past its line box: no scrollbar for that */
   overflow-y: auto;
   scrollbar-width: thin;
