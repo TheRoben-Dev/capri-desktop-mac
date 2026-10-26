@@ -30,10 +30,16 @@ if (process.platform !== 'darwin') {
   fail('it only builds on macOS');
 }
 
-const args = ['build', '-c', 'release', '--arch', 'arm64', '--arch', 'x86_64', '--package-path', PKG];
-const build = spawnSync('swift', args, { stdio: 'inherit' });
+let args = ['build', '-c', 'release', '--arch', 'arm64', '--arch', 'x86_64', '--package-path', PKG];
+let build = spawnSync('swift', args, { stdio: 'inherit' });
 if (build.error) fail('swift not found (xcode-select --install)');
-if (build.status !== 0) fail(`swift build exited with ${build.status}`);
+if (build.status !== 0) {
+  // the Command Line Tools alone can lack the Intel half of Swift's libraries: this Mac's architecture is enough to run here
+  console.warn('[capri] mac helper: Apple Silicon + Intel build failed, building for this Mac only');
+  args = ['build', '-c', 'release', '--package-path', PKG];
+  build = spawnSync('swift', args, { stdio: 'inherit' });
+  if (build.status !== 0) fail(`swift build exited with ${build.status}`);
+}
 
 const bin = spawnSync('swift', [...args, '--show-bin-path'], { encoding: 'utf8' }).stdout.trim();
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
