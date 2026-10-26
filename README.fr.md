@@ -139,12 +139,18 @@ dans sa langue.
 **C'est une IA.** Ses réponses sont écrites par le modèle, pas par les scénaristes de la série : c'est une version
 fan d'elle, et le panneau du chat le dit à chaque fois.
 
-**Fermer une appli** (Windows) : demande-lui (« ferme AM Music », « tu peux couper Discord ? ») et elle te propose un
+**Fermer une appli** (Windows et macOS) : demande-lui (« ferme AM Music », « tu peux couper Discord ? ») et elle te propose un
 bouton au nom de l'appli. Rien ne se passe tant que tu ne cliques pas. Elle la ferme comme son propre bouton de
 fermeture, donc l'appli peut encore te demander d'enregistrer. Si elle s'est seulement cachée dans la zone de
 notification, elle te propose **Forcer la fermeture**, là encore seulement sur ton clic (le travail non enregistré est
-alors perdu). Elle ne ferme jamais les morceaux de Windows, Claude, Ollama ni elle-même, et elle ne peut rien faire
-d'autre sur ton PC.
+alors perdu). Elle ne ferme jamais les morceaux du système, Claude, Ollama ni elle-même.
+
+**Ouvrir des applis, raccourcis, musique** : demande-lui d'ouvrir une appli installée (« ouvre Spotify »), de lancer un
+de tes raccourcis (macOS : « lance Lumières éteintes »), ou de lancer, mettre en pause, passer un morceau ou changer le
+volume (« baisse le son », « volume 30 » sous macOS). Même principe : elle te propose un bouton, et seul ton clic le
+fait. Elle ne choisit que parmi ce qui est vraiment installé (et ta liste de raccourcis), jamais une commande à elle.
+Sous macOS, la première fois qu'elle pilote Musique ou Spotify, macOS te demande si Capri en a le droit. À part ça, elle
+ne peut rien faire d'autre sur ton ordinateur.
 
 Elle n'attrape la souris que sur son corps (au pixel près) : tout le reste de l'écran reste utilisable normalement.
 
@@ -373,6 +379,8 @@ src/main/                Electron : fenêtre transparente plein écran, clic à 
   windows.js / .ps1      où sont les autres fenêtres (Windows), pour qu'elle s'assoie dessus
   ollama.js              son chat : le modèle local, via Ollama
   apps.js                fermer une appli que tu lui demandes de fermer (après ton clic)
+  actions.js             ouvrir une appli, lancer un raccourci, la musique et le volume (après ton clic)
+  mac-helper.js          où est le programme Swift (native/mac-helper : fenêtres et applis sous macOS)
 src/renderer/js/
   sprite.js              shader WebGL : tête, crinière, position assise, smears, images rémanentes, couleurs, glitch
   acting.js              les feuilles d'exposition : chaque mouvement, dessin par dessin

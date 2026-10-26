@@ -95,4 +95,4 @@ async function close(name, { force = false } = {}) {
   return { running: Number(out) > 0 };
 }
 
-module.exports = { list, find, close };
+module.exports = { list, find, close, powershell };

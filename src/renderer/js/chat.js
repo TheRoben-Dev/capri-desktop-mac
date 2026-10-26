@@ -1,7 +1,10 @@
 // Talking to her: you type in her panel, and a local model (Ollama, from the main process) answers
 // as her, in writing. The replies are AI-generated, and the panel says so on every chat.
-// Ask her to close an app and she will (Windows): she spots it in what you wrote (or the model names
-// it with a tag in its answer), shows you a button with that app's name, and only your click closes it.
+// Ask her to close an app and she will: she spots it in what you wrote (or the model names it with a
+// tag in its answer), shows you a button with that app's name, and only your click closes it. Same for
+// opening an app, running one of your Shortcuts (macOS), and the music and volume: the model ends its
+// answer with a tag ([[open: Safari]]), she checks it against what's really there (actions.js), and
+// nothing happens until you click her button.
 
 import { pick, fmt } from './util.js';
 
@@ -9,7 +12,9 @@ const REMEMBER = 12; // messages of this conversation she keeps in mind
 const LANGUAGE = { fr: 'French', en: 'English', es: 'Spanish', pt: 'Brazilian Portuguese', ru: 'Russian' };
 const STAY_MS = 10 * 60 * 1000; // no wandering off mid-conversation
 const LOADING_AFTER_MS = 5000;
-const CLOSE_TAG = /\[\[\s*close\s*:?\s*([^\]]*)\]\]/i; // [[close: AM Music]] at the end of her answer
+// [[close: AM Music]], [[open: Safari]], [[shortcut: Lights off]], [[media: pause]] at the end of her answer
+const TAG = /\[\[\s*(close|open|shortcut|media)\s*:?\s*([^\]]*)\]\]/i;
+const NAMES_MAX = 200; // installed apps named to the model, at most
 // "close", "shut down", "ferme", "quitte", "cierra", "fecha", "закрой"... in any of her languages
 const CLOSE_ASK = /\b(close|shut|quit|kill|exit)|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|закр|выключ/i;
 
@@ -25,6 +30,7 @@ export class Chat {
     this.turn = 0;     // id of the answer coming in, if any
     this.answer = '';
     this.apps = [];    // the apps open on this PC, as last listed: [{ name, label }]
+    this.actions = { open: [], shortcut: [], media: [] }; // the rest she can do here (actions.js)
     this.appsReady = Promise.resolve();
     host.onChatDelta(({ id, text }) => this.onDelta(id, text));
   }
@@ -142,13 +148,19 @@ export class Chat {
     this.panel.setFace(mood(answer));
     this.panel.setChatBusy(false);
     // what you asked for first (a small model doesn't always write its tag right), else its tag
-    const wanted = this.askedToClose(text) || tagged(res.text);
+    const wanted = this.askedToClose(text);
+    const tag = tagged(res.text);
     if (wanted) this.offerClose(wanted, answer);
+    else if (tag?.kind === 'close') this.offerClose(tag.name, answer);
+    else if (tag) this.offerAction(tag.kind, tag.name, answer);
     this.listApps(); // fresh for the next message
   }
 
   listApps() {
-    this.appsReady = this.host.openApps().then((list) => { this.apps = list || []; }).catch(() => {});
+    this.appsReady = Promise.all([
+      this.host.openApps().then((list) => { this.apps = list || []; }),
+      this.host.listActions().then((list) => { if (list) this.actions = list; }),
+    ]).catch(() => {});
   }
 
   // "close am music pls": an app that's open, named in a message asking to close something.
@@ -204,13 +216,67 @@ export class Chat {
     this.listApps();
   }
 
-  // What she can do on the PC: close an app you ask her to (Windows), and nothing else.
+  // She was asked to open an app, run a Shortcut or change the music: a button, and nothing happens
+  // until you click it. Only something that's really there (the model can name anything).
+  async offerAction(kind, wanted, answer) {
+    const { t } = this;
+    const name = await this.host.findAction(kind, wanted);
+    if (!this.open || this.turn) return;
+    if (!name) {
+      this.panel.stream(`${answer}\n${fmt(t.noSuch, { name: wanted })}`, { done: true });
+      return;
+    }
+    this.panel.setActions(
+      [{ id: 'go', label: this.actionLabel(kind, name), primary: true }, { id: 'no', label: t.no }],
+      (id) => (id === 'go' ? this.runAction(kind, name) : this.panel.setActions([])),
+    );
+  }
+
+  actionLabel(kind, name) {
+    const { t } = this;
+    if (kind === 'open') return fmt(t.openIt, { app: name });
+    if (kind === 'shortcut') return fmt(t.runIt, { name });
+    const level = /^volume (\d+)$/.exec(name);
+    return level ? fmt(t.media.volume, { n: level[1] }) : t.media[name] || name;
+  }
+
+  async runAction(kind, name) {
+    const { t, capri } = this;
+    this.panel.setActions([]);
+    const h = capri.head();
+    capri.zap(h.x + capri.towardCenter() * 280, h.y - 170);
+    const res = await this.host.runAction(kind, name);
+    if (!this.open) return;
+    let line;
+    if (res.error === 'noPlayer') line = t.noPlayer;
+    else if (res.error) line = `${t.failed} ${res.error}`;
+    else if (kind === 'open') line = fmt(t.opened, { app: name });
+    else if (kind === 'shortcut') line = fmt(t.ran, { name });
+    else line = t.mediaDone;
+    this.panel.setFace(res.error ? 'aside' : 'laugh');
+    this.panel.stream(line, { done: true });
+    this.history.push({ role: 'assistant', content: line });
+    this.listApps();
+  }
+
+  // What she can do on the computer: close or open an app, run a Shortcut, the music and volume,
+  // each only when you ask and after your click; nothing else.
   powers() {
-    const cant = 'you can\'t see the user\'s screen or files, and you can\'t open apps or touch anything else on their PC (music, settings, files): if asked, say plainly that you can\'t, in character, and don\'t pretend to.';
-    if (!this.apps.length) return [`You can't close apps here, and ${cant}`];
-    const open = this.apps.map(({ name, label }) => (label && label !== name ? `${name} (${label})` : name)).join(', ');
+    const cant = 'you can\'t see the user\'s screen or files, or do anything else on their computer (settings, files, messages): if asked, say plainly that you can\'t, in character, and don\'t pretend to.';
+    const { open, shortcut, media } = this.actions;
+    const can = [];
+    if (this.apps.length) {
+      const running = this.apps.map(({ name, label }) => (label && label !== name ? `${name} (${label})` : name)).join(', ');
+      can.push(`Close an app that's open: [[close: NAME]], NAME being the exact name from this list (the part before the parentheses): ${running}.`);
+    }
+    if (open.length) can.push(`Open an installed app: [[open: NAME]], NAME from: ${open.slice(0, NAMES_MAX).join(', ')}.`);
+    if (shortcut.length) can.push(`Run one of their Shortcuts: [[shortcut: NAME]], NAME from: ${shortcut.join(', ')}.`);
+    if (media.length) can.push(`Control the music and the volume: [[media: WHAT]], WHAT one of: ${media.join(', ')}.`);
+    if (!can.length) return [`You can't do anything on the user's computer here, and ${cant}`];
     return [
-      `You can close an app that's open on the user's PC, only when they ask you to. Then say in a few words that you will, and end your answer with [[close: NAME]], NAME being the exact name from this list (the part before the parentheses). They get a button to confirm it, so never say it's already done. Apps open right now: ${open}.`,
+      'What you can do on the user\'s computer, only when they ask you to:',
+      ...can,
+      'Then say in a few words that you will, and end your answer with that one tag. They get a button to confirm it, so never say it\'s already done.',
       `Apart from that, ${cant}`,
     ];
   }
@@ -242,18 +308,18 @@ export class Chat {
 function clean(text) {
   return String(text)
     .replace(/<think>[\s\S]*?(<\/think>|$)/g, '')
-    .replace(/\[\[[^\]]*(\]\]|$)/g, '') // her close tag (read from the raw answer, never shown)
+    .replace(/\[\[[^\]]*(\]\]|$)/g, '') // her action tag (read from the raw answer, never shown)
     .replace(/[*_`#]+/g, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
 }
 
-// The app named by her close tag: [[close: AM Music]], or a sloppier [[close]] AM Music.
+// Her action tag: { kind, name } from [[open: AM Music]], or a sloppier [[open]] AM Music.
 function tagged(text) {
-  const tag = CLOSE_TAG.exec(text);
+  const tag = TAG.exec(text);
   if (!tag) return null;
-  const name = tag[1].trim() || text.slice(tag.index + tag[0].length).split('\n')[0].replace(/^[\s:.]+|[\s.!]+$/g, '');
-  return name || null;
+  const name = tag[2].trim() || text.slice(tag.index + tag[0].length).split('\n')[0].replace(/^[\s:.]+|[\s.!]+$/g, '');
+  return name ? { kind: tag[1].toLowerCase(), name } : null;
 }
 
 const simple = (text) => String(text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
