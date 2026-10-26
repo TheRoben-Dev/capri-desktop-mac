@@ -23,8 +23,8 @@ const RUN_ASK = /\b(run|start|do|launch|lance|ex[ée]cut|ejecut|execut|roda|за
 const MEDIA_ASK = [
   ['unmute', /\bunmute|r[ée]activ\w* le son|remet\w* le son|activa\w* el (sonido|audio)|ativ\w* o som|включи звук/i],
   ['mute', /\bmute\b|\bsilence\b|coupe le son|\bmuet|silenci|\bmudo|выключи звук|без звука/i],
-  ['volume up', /\bturn (it |the (volume|music|sound) )?up|\blouder|volume up|monte\w* le son|plus fort|sube el volumen|m[aá]s alto|aumenta|громче/i],
-  ['volume down', /\bturn (it |the (volume|music|sound) )?down|\bquieter|\bsofter|volume down|baisse\w* le son|moins fort|baja el volumen|abaixa|тише/i],
+  ['volume up', /\bturn (it |the (volume|music|sound) )?up|\b(raise|increase|boost|pump up|crank( up)?) (the |my )?(volume|sound|music)|\blouder|volume up|monte\w* le son|plus fort|sube el volumen|m[aá]s alto|aumenta|громче/i],
+  ['volume down', /\bturn (it |the (volume|music|sound) )?down|\b(lower|decrease|reduce|drop) (the |my )?(volume|sound|music)|\bquieter|\bsofter|volume down|baisse\w* le son|moins fort|baja el volumen|abaixa|тише/i],
   ['pause', /\bpause|stop (the |my )?music|pausa|arr[êe]te la musique|пауз|останови музык/i],
   ['next', /\bnext (song|track)|\bskip (this|it|the (song|track))\b|suivant|siguiente|pr[óo]xim|следующ/i],
   ['previous', /\b(previous|last) (song|track)|pr[ée]c[ée]dent|anterior|предыдущ/i],
@@ -162,12 +162,15 @@ export class Chat {
     this.panel.setFace(mood(answer));
     this.panel.setChatBusy(false);
     // what you asked for first (a small model doesn't always write its tag right), else its tag
+    // ("raise the volume" with a [[close: Music]] from the model is the volume)
     const wanted = this.askedToClose(text);
+    const asked = this.askedFor(text);
     const tag = tagged(res.text);
     if (wanted) this.offerClose(wanted, answer);
-    else if (tag?.kind === 'close') this.offerClose(tag.name, answer);
-    else if (tag) this.offerAction(tag.kind, tag.name, answer);
-    else this.offerAsked(text);
+    else if (tag && !(asked && asked.kind !== tag.kind)) {
+      if (tag.kind === 'close') this.offerClose(tag.name, answer);
+      else this.offerAction(tag.kind, tag.name, answer);
+    } else if (asked) this.offerAction(asked.kind, asked.name, answer, true);
     this.listApps(); // fresh for the next message
   }
 
@@ -191,26 +194,19 @@ export class Chat {
     return best?.app.name || null;
   }
 
-  // No tag, but your message asks for the music, the volume, an app or a Shortcut in so many words:
-  // her button all the same (and nothing if it names nothing that's really here).
-  async offerAsked(text) {
+  // Your message asks for the music, the volume, an app or a Shortcut in so many words: { kind, name }.
+  // A small model doesn't always write its tag for these (and nothing comes of a name that's not here).
+  askedFor(text) {
     const level = VOLUME_ASK.exec(text);
     const media = level ? `volume ${level[2] || level[3]}` : MEDIA_ASK.find(([, ask]) => ask.test(text))?.[0];
     const said = simple(text);
     const named = (names) => names.filter((n) => simple(n).length >= 3 && said.includes(simple(n))).sort((a, b) => b.length - a.length)[0];
     const shortcut = RUN_ASK.test(text) && named(this.actions.shortcut);
     const open = OPEN_ASK.exec(text);
-    let ask = null;
-    if (shortcut) ask = { kind: 'shortcut', wanted: shortcut };
-    else if (media && this.actions.media.length) ask = { kind: 'media', wanted: media };
-    else if (open) ask = { kind: 'open', wanted: named(this.actions.open) || open[1].replace(/\b(app|please|pls|plz|for me|stp|por favor|пожалуйста)\b|[?!.,]+/gi, ' ').trim() };
-    if (!ask) return;
-    const name = await this.host.findAction(ask.kind, ask.wanted);
-    if (!name || !this.open || this.turn) return;
-    this.panel.setActions(
-      [{ id: 'go', label: this.actionLabel(ask.kind, name), primary: true }, { id: 'no', label: this.t.no }],
-      (id) => (id === 'go' ? this.runAction(ask.kind, name) : this.panel.setActions([])),
-    );
+    if (shortcut) return { kind: 'shortcut', name: shortcut };
+    if (media && this.actions.media.length) return { kind: 'media', name: media };
+    if (open) return { kind: 'open', name: named(this.actions.open) || open[1].replace(/\b(app|please|pls|plz|for me|stp|por favor|пожалуйста)\b|[?!.,]+/gi, ' ').trim() };
+    return null;
   }
 
   // She was asked to close an app: a button with its name, and nothing happens until you click it.
@@ -255,10 +251,10 @@ export class Chat {
 
   // She was asked to open an app, run a Shortcut or change the music: a button, and nothing happens
   // until you click it. Only something that's really there (the model can name anything).
-  async offerAction(kind, wanted, answer) {
+  async offerAction(kind, wanted, answer, quiet = false) {
     const { t } = this;
     const name = await this.host.findAction(kind, wanted);
-    if (!this.open || this.turn) return;
+    if (!this.open || this.turn || (!name && quiet)) return;
     if (!name) {
       this.panel.stream(`${answer}\n${fmt(t.noSuch, { name: wanted })}`, { done: true });
       return;
