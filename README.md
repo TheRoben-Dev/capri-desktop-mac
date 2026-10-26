@@ -141,6 +141,18 @@ deal: she offers a button, and only your click does it. She only picks from what
 Shortcuts list), never a command of her own. On macOS, the first time she controls Music or Spotify, macOS asks
 whether Capri may. Apart from that, she can't do anything else on your computer.
 
+**Looking things up on the web**: ask her to search ("search for the Warframe patch notes", "look up the RTX 5090
+price"), or just ask something current: the model can ask for a search itself. You see "Searching the net: …" while she
+does, then her answer from the results, with up to three buttons to the pages it came from. Searches are read-only, so
+there's no button to confirm. They go to DuckDuckGo (no key needed), or to [Brave Search](https://brave.com/search/api/)
+if you put an API key in `braveKey`, or to your own SearXNG instance (`searxngUrl`, with `format: json` allowed): her
+menu › **Web search** › **Search settings…** opens that file. That same menu turns it off. This is the one thing in the
+chat that leaves your computer: the search words, and a plain visit to the first two result pages.
+
+Small models (llama3.2) answer from results poorly and often forget to ask for a search: for this, a bigger model such
+as `qwen3:14b` (about 9 GB, `ollama pull qwen3:14b`) does much better. From 7B up, a model that supports tool calling
+asks for searches through it instead of a tag.
+
 She only catches the mouse on her actual body (pixel-precise): the rest of the screen works as usual.
 
 - **Click** her: she tells you where Claude is at (nothing going on: a **Talk to me** button, to chat with her).
@@ -362,6 +374,7 @@ src/main/                Electron: full-screen transparent click-through window,
   ollama.js              her chat: the local model, through Ollama
   apps.js                closing an app you asked her to close (after your click)
   actions.js             opening an app, running a Shortcut, music and volume (after your click)
+  search.js              web search for her chat (DuckDuckGo, Brave, SearXNG) and reading the first pages
   mac-helper.js          where the Swift helper is (native/mac-helper: windows and apps on macOS)
 src/renderer/js/
   sprite.js              WebGL shader: head tilt, mane flare, sitting, smears, afterimages, colors, glitch

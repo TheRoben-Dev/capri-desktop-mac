@@ -152,6 +152,19 @@ fait. Elle ne choisit que parmi ce qui est vraiment installé (et ta liste de ra
 Sous macOS, la première fois qu'elle pilote Musique ou Spotify, macOS te demande si Capri en a le droit. À part ça, elle
 ne peut rien faire d'autre sur ton ordinateur.
 
+**Chercher sur le web** : demande-lui de chercher (« recherche les notes de patch de Warframe », « cherche sur internet
+le prix de la RTX 5090 »), ou pose juste une question d'actualité : le modèle peut demander une recherche lui-même. Tu
+vois « Je fouille le net : … » pendant qu'elle cherche, puis sa réponse tirée des résultats, avec jusqu'à trois boutons
+vers les pages d'où elle vient. Une recherche ne fait que lire, donc pas de bouton à confirmer. Elle passe par DuckDuckGo
+(sans clé), ou par [Brave Search](https://brave.com/search/api/) si tu mets une clé d'API dans `braveKey`, ou par ta
+propre instance SearXNG (`searxngUrl`, avec `format: json` autorisé) : son menu › **Recherche web** › **Réglages de
+recherche…** ouvre ce fichier. Ce même menu la désactive. C'est la seule chose du chat qui sort de ton ordinateur : les
+mots cherchés, et une simple visite des deux premières pages de résultats.
+
+Les petits modèles (llama3.2) résument mal et oublient souvent de demander une recherche : pour ça, un modèle plus gros
+comme `qwen3:14b` (environ 9 Go, `ollama pull qwen3:14b`) fait bien mieux. À partir de 7B, un modèle qui gère l'appel
+d'outils demande ses recherches par là plutôt que par une balise.
+
 Elle n'attrape la souris que sur son corps (au pixel près) : tout le reste de l'écran reste utilisable normalement.
 
 - **Clic** sur elle : elle te dit où en est Claude (s'il ne se passe rien : un bouton **Parle-moi**, pour discuter
@@ -380,6 +393,7 @@ src/main/                Electron : fenêtre transparente plein écran, clic à 
   ollama.js              son chat : le modèle local, via Ollama
   apps.js                fermer une appli que tu lui demandes de fermer (après ton clic)
   actions.js             ouvrir une appli, lancer un raccourci, la musique et le volume (après ton clic)
+  search.js              recherche web pour son chat (DuckDuckGo, Brave, SearXNG) et lecture des premières pages
   mac-helper.js          où est le programme Swift (native/mac-helper : fenêtres et applis sous macOS)
 src/renderer/js/
   sprite.js              shader WebGL : tête, crinière, position assise, smears, images rémanentes, couleurs, glitch

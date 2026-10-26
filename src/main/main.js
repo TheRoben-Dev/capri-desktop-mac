@@ -15,6 +15,7 @@ const { startWindowWatch } = require('./windows');
 const ollama = require('./ollama');
 const apps = require('./apps');
 const actions = require('./actions');
+const search = require('./search');
 const hooks = require('../../scripts/install-hooks');
 const demoSteps = require('../../scripts/demo-sequence');
 
@@ -39,6 +40,22 @@ let windowWatch = null;
 let lastWindows = null;
 let chatModels = null; // the Ollama models, as last seen (null: Ollama not reached)
 const chats = new Map(); // id -> AbortController of an answer being streamed
+const sources = new Set(); // the pages her last searches came from: the only links her buttons open
+// The model asks for a search with this (Ollama tool calling), when it's big enough to use it well
+const SEARCH_TOOL = {
+  type: 'function',
+  function: {
+    name: 'web_search',
+    description: 'Search the web. Only for news, prices, release dates, scores, weather or other current facts, or when the user asks you to look something up. Not for chit-chat.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'A few search keywords' } },
+      required: ['query'],
+    },
+  },
+};
+const TOOLS_FROM_B = 7; // a smaller model calls tools for everything: it gets the [[search: …]] tag instead
+const SEARCH_TAG = /\[\[\s*search\s*:?\s*([^\]]+)\]\]/i;
 
 const userSoundsDir = () => path.join(app.getPath('userData'), 'sounds');
 
@@ -253,6 +270,16 @@ function rebuildTray() {
     { label: t.wander, type: 'checkbox', checked: cfg.wander, click: (item) => updateConfig({ wander: item.checked }) },
     { label: t.possess, type: 'checkbox', checked: cfg.possess, click: (item) => updateConfig({ possess: item.checked }) },
     {
+      label: t.webSearch,
+      submenu: [
+        {
+          label: `${t.webSearch} (${search.engine(cfg)})`, type: 'checkbox', checked: cfg.webSearch,
+          click: (item) => updateConfig({ webSearch: item.checked }),
+        },
+        { label: t.searchSettings, click: openSettingsFile },
+      ],
+    },
+    {
       label: t.lang,
       submenu: [[t.auto, 'auto'], ...LANGS.map((lang) => [TRAY[lang].name, lang])].map(([label, lang]) => ({
         label, type: 'radio', checked: cfg.lang === lang, click: () => updateConfig({ lang }),
@@ -274,6 +301,15 @@ function rebuildTray() {
   ]);
   tray.setContextMenu(menu);
   trayMenu = menu;
+}
+
+// Her settings file, for what has no menu (a Brave Search key, a SearXNG address): in a text editor.
+async function openSettingsFile() {
+  config.save({}); // there with every setting, the empty ones too
+  const failed = MAC
+    ? await new Promise((resolve) => require('node:child_process').execFile('/usr/bin/open', ['-t', config.file()], (err) => resolve(err)))
+    : await shell.openPath(config.file());
+  if (failed) shell.showItemInFolder(config.file());
 }
 
 // Run from a clone (`npm start`), electron.exe alone would open the default Electron app at login:
@@ -343,16 +379,55 @@ function registerIpc() {
     if (!models) return { ok: false, error: 'offline' };
     if (!models.length) return { ok: false, error: 'nomodel' };
     ollama.warm(pickModel()); // loading while you type your first message
-    return { ok: true, model: pickModel() };
+    return { ok: true, model: pickModel(), search: config.load().webSearch };
   });
-  // her answer, streamed to the overlay piece by piece as `chat:delta`
-  ipcMain.handle('chat:send', async (_e, { id, messages }) => {
+  // her answer, streamed to the overlay piece by piece as `chat:delta`. With a web search on the
+  // way (you asked for one, or the model did): `chat:search`, then the answer from its results.
+  ipcMain.handle('chat:send', async (_e, { id, messages, search: asked }) => {
     const abort = new AbortController();
     chats.set(id, abort);
     try {
+      const cfg = config.refresh();
+      const model = pickModel(cfg);
       const send = (text) => overlay?.webContents.send('chat:delta', { id, text });
-      const text = await ollama.chat({ model: pickModel(), messages }, send, abort.signal);
-      return { ok: true, text };
+      const found = [];
+      const lookUp = async (query) => {
+        query = String(query).trim().slice(0, 200);
+        overlay?.webContents.send('chat:search', { id, query, engine: search.engine(cfg) });
+        try {
+          const result = await search.run(query, cfg, abort.signal);
+          for (const r of result.results.slice(0, 3)) {
+            found.push({ title: r.title, url: r.url });
+            sources.add(r.url);
+          }
+          return search.forModel(result);
+        } catch (err) {
+          if (abort.signal.aborted) throw err;
+          return `The web search for "${query}" failed (${err.message}). Tell the user, in character, and don't make an answer up.`;
+        }
+      };
+      const answer = (list) => ollama.chat({ model, messages: list, predict: 360 }, send, abort.signal);
+      if (!cfg.webSearch) {
+        const { text } = await ollama.chat({ model, messages }, send, abort.signal);
+        return { ok: true, text };
+      }
+      // you asked for a search in so many words: no need for the model to ask too
+      if (asked) {
+        const results = await lookUp(asked);
+        const { text } = await answer([...messages, { role: 'system', content: results }]);
+        return { ok: true, text, sources: found };
+      }
+      const { tools, billions } = await ollama.info(model);
+      const useTools = tools && billions >= TOOLS_FROM_B;
+      const first = await ollama.chat({ model, messages, tools: useTools ? [SEARCH_TOOL] : undefined }, send, abort.signal);
+      const call = first.calls.find((c) => c.function?.name === 'web_search' && c.function.arguments?.query);
+      const query = call ? call.function.arguments.query : SEARCH_TAG.exec(first.text)?.[1];
+      if (!query) return { ok: true, text: first.text };
+      const results = await lookUp(query);
+      const { text } = await answer(call
+        ? [...messages, { role: 'assistant', content: first.text, tool_calls: first.calls }, { role: 'tool', content: results, tool_name: 'web_search' }]
+        : [...messages, { role: 'assistant', content: first.text }, { role: 'system', content: results }]);
+      return { ok: true, text, sources: found };
     } catch (err) {
       return { ok: false, error: abort.signal.aborted ? 'stopped' : err.message };
     } finally {
@@ -361,6 +436,10 @@ function registerIpc() {
   });
   ipcMain.on('chat:stop', (_e, id) => chats.get(id)?.abort());
   ipcMain.on('chat:ollama', () => shell.openExternal(OLLAMA_SITE));
+  // a source of her answer, from its button: only a page one of her searches found
+  ipcMain.on('chat:source', (_e, url) => {
+    if (sources.has(url) && search.isPublic(url)) shell.openExternal(url);
+  });
   // closing an app you asked her to close, once you've clicked to confirm (apps.js)
   const appInfo = (app) => app && { name: app.process, label: app.label };
   ipcMain.handle('apps:list', async () => (await apps.list().catch(() => [])).map(appInfo));

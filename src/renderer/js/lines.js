@@ -85,6 +85,7 @@ export const LINES = {
       mediaDone: 'C’est fait.',
       noPlayer: 'Aucun lecteur ouvert. Lance Musique ou Spotify d’abord.',
       noSuch: 'Je ne trouve pas « {name} » ici.',
+      searching: 'Je fouille le net : « {q} »…', // a web search for her answer (search.js)
     },
     // sa carte de rapport : ce que Claude a abattu aujourd'hui (son menu, ou d'elle-même le soir)
     report: {
@@ -251,6 +252,7 @@ export const LINES = {
       mediaDone: 'Done.',
       noPlayer: 'No player open. Start Music or Spotify first.',
       noSuch: 'I can’t find “{name}” here.',
+      searching: 'Searching the net: “{q}”…', // a web search for her answer (search.js)
     },
     // her report card: what Claude got through today (her menu, or on her own in the evening)
     report: {
@@ -416,6 +418,7 @@ export const LINES = {
       mediaDone: 'Hecho.',
       noPlayer: 'No hay ningún reproductor abierto. Abre Música o Spotify primero.',
       noSuch: 'No encuentro «{name}» aquí.',
+      searching: 'Buscando en la red: «{q}»…', // a web search for her answer (search.js)
     },
     // su informe: lo que Claude sacó hoy (su menú, o ella sola por la tarde)
     report: {
@@ -580,6 +583,7 @@ export const LINES = {
       mediaDone: 'Feito.',
       noPlayer: 'Nenhum player aberto. Abra o Música ou o Spotify primeiro.',
       noSuch: 'Não acho “{name}” aqui.',
+      searching: 'Vasculhando a rede: “{q}”…', // a web search for her answer (search.js)
     },
     // o relatório dela: o que o Claude fez hoje (o menu dela, ou sozinha à noite)
     report: {
@@ -744,6 +748,7 @@ export const LINES = {
       mediaDone: 'Готово.',
       noPlayer: 'Плеер не открыт. Сначала запусти Музыку или Spotify.',
       noSuch: 'Не нахожу «{name}» здесь.',
+      searching: 'Ищу в сети: «{q}»…', // a web search for her answer (search.js)
     },
     // её отчёт: что Claude сделал за день (её меню, или сама вечером)
     report: {

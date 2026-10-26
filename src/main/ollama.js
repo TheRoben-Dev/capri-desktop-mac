@@ -38,8 +38,32 @@ function warm(model) {
   }).catch(() => {});
 }
 
-// Her answer, streamed: onDelta(piece) as it comes, resolves with all of it.
-async function chat({ model, messages }, onDelta, signal) {
+// What a model can do and how big it is: { tools: can call functions, billions: its size }.
+const shown = new Map();
+async function info(model) {
+  if (!shown.has(model)) {
+    shown.set(model, (async () => {
+      const res = await fetch(`${base()}/api/show`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model }),
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!res.ok) throw await failure(res);
+      const json = await res.json();
+      const size = /([\d.]+)\s*B/i.exec(json.details?.parameter_size || '');
+      return { tools: (json.capabilities || []).includes('tools'), billions: size ? Number(size[1]) : 0 };
+    })().catch(() => {
+      shown.delete(model);
+      return { tools: false, billions: 0 };
+    }));
+  }
+  return shown.get(model);
+}
+
+// Her answer, streamed: onDelta(piece) as it comes, resolves with { text, calls } (calls: the
+// functions from `tools` the model asked to run, if any).
+async function chat({ model, messages, tools, predict = 240 }, onDelta, signal) {
   const res = await fetch(`${base()}/api/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -48,7 +72,8 @@ async function chat({ model, messages }, onDelta, signal) {
       messages,
       stream: true,
       keep_alive: '15m', // she stays loaded while you chat
-      options: { temperature: 0.85, num_predict: 240 },
+      ...(tools?.length ? { tools } : {}),
+      options: { temperature: 0.85, num_predict: predict },
     }),
     signal,
   });
@@ -56,6 +81,7 @@ async function chat({ model, messages }, onDelta, signal) {
   const decoder = new TextDecoder();
   let buffer = '';
   let text = '';
+  const calls = [];
   for await (const chunk of res.body) {
     buffer += decoder.decode(chunk, { stream: true });
     let nl;
@@ -70,10 +96,11 @@ async function chat({ model, messages }, onDelta, signal) {
         text += piece;
         onDelta(piece);
       }
-      if (msg.done) return text;
+      calls.push(...(msg.message?.tool_calls || []));
+      if (msg.done) return { text, calls };
     }
   }
-  return text;
+  return { text, calls };
 }
 
-module.exports = { models, warm, chat };
+module.exports = { models, warm, chat, info };

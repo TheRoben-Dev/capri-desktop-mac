@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('host', {
   chatSend: (request) => ipcRenderer.invoke('chat:send', request),
   chatStop: (id) => ipcRenderer.send('chat:stop', id),
   onChatDelta: on('chat:delta'),
+  onChatSearch: on('chat:search'),
+  openSource: (url) => ipcRenderer.send('chat:source', String(url || '')),
   openOllama: () => ipcRenderer.send('chat:ollama'),
   openApps: () => ipcRenderer.invoke('apps:list'),
   findApp: (wanted) => ipcRenderer.invoke('apps:find', wanted),
