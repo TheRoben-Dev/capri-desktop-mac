@@ -14,9 +14,23 @@ const STAY_MS = 10 * 60 * 1000; // no wandering off mid-conversation
 const LOADING_AFTER_MS = 5000;
 // [[close: AM Music]], [[open: Safari]], [[shortcut: Lights off]], [[media: pause]] at the end of her answer
 const TAG = /\[\[\s*(close|open|shortcut|media)\s*:?\s*([^\]]*)\]\]/i;
-const NAMES_MAX = 200; // installed apps named to the model, at most
 // "close", "shut down", "ferme", "quitte", "cierra", "fecha", "закрой"... in any of her languages
 const CLOSE_ASK = /\b(close|shut|quit|kill|exit)|ferm|quitt|coupe|arr[êe]t|cierr|cerra|fech|закр|выключ/i;
+// "open", "launch", "ouvre", "lance", "abre", "открой"... then the app's name
+const OPEN_ASK = /(?:\b(?:open|launch|start\s+up)|\bouvr\w*|\blance|\babr[ea]|\binici\w*|открой|запусти)\s+(?:the\s+|my\s+|le\s+|la\s+|l'|el\s+|o\s+|a\s+)?(.+)/i;
+const RUN_ASK = /\b(run|start|do|launch|lance|ex[ée]cut|ejecut|execut|roda|запусти)|shortcut|raccourci|atajo|atalho|быстр/i;
+// The music and the volume, in so many words: a small model doesn't always write its tag for these
+const MEDIA_ASK = [
+  ['unmute', /\bunmute|r[ée]activ\w* le son|remet\w* le son|activa\w* el (sonido|audio)|ativ\w* o som|включи звук/i],
+  ['mute', /\bmute\b|\bsilence\b|coupe le son|\bmuet|silenci|\bmudo|выключи звук|без звука/i],
+  ['volume up', /\bturn (it |the (volume|music|sound) )?up|\blouder|volume up|monte\w* le son|plus fort|sube el volumen|m[aá]s alto|aumenta|громче/i],
+  ['volume down', /\bturn (it |the (volume|music|sound) )?down|\bquieter|\bsofter|volume down|baisse\w* le son|moins fort|baja el volumen|abaixa|тише/i],
+  ['pause', /\bpause|stop (the |my )?music|pausa|arr[êe]te la musique|пауз|останови музык/i],
+  ['next', /\bnext (song|track)|\bskip (this|it|the (song|track))\b|suivant|siguiente|pr[óo]xim|следующ/i],
+  ['previous', /\b(previous|last) (song|track)|pr[ée]c[ée]dent|anterior|предыдущ/i],
+  ['play', /\b(play|resume)\b.*\b(music|song|spotify)|^\s*(play|resume)\b|joue|remets la musique|reprend|reproduc|\btoca|включи музык/i],
+];
+const VOLUME_ASK = /(volume|vol\b|son\b|sonido|som\b|громкост)\D{0,15}?(\d{1,3})\s*%?|(\d{1,3})\s*%?\s*(de |of )?(volume|громкост)/i;
 
 export class Chat {
   constructor({ capri, panel, voice, host, brain }) {
@@ -30,7 +44,7 @@ export class Chat {
     this.turn = 0;     // id of the answer coming in, if any
     this.answer = '';
     this.apps = [];    // the apps open on this PC, as last listed: [{ name, label }]
-    this.actions = { open: [], shortcut: [], media: [] }; // the rest she can do here (actions.js)
+    this.actions = { open: [], shortcut: [], media: [], volume: false }; // the rest she can do here (actions.js)
     this.appsReady = Promise.resolve();
     host.onChatDelta(({ id, text }) => this.onDelta(id, text));
   }
@@ -153,6 +167,7 @@ export class Chat {
     if (wanted) this.offerClose(wanted, answer);
     else if (tag?.kind === 'close') this.offerClose(tag.name, answer);
     else if (tag) this.offerAction(tag.kind, tag.name, answer);
+    else this.offerAsked(text);
     this.listApps(); // fresh for the next message
   }
 
@@ -174,6 +189,28 @@ export class Chat {
       }
     }
     return best?.app.name || null;
+  }
+
+  // No tag, but your message asks for the music, the volume, an app or a Shortcut in so many words:
+  // her button all the same (and nothing if it names nothing that's really here).
+  async offerAsked(text) {
+    const level = VOLUME_ASK.exec(text);
+    const media = level ? `volume ${level[2] || level[3]}` : MEDIA_ASK.find(([, ask]) => ask.test(text))?.[0];
+    const said = simple(text);
+    const named = (names) => names.filter((n) => simple(n).length >= 3 && said.includes(simple(n))).sort((a, b) => b.length - a.length)[0];
+    const shortcut = RUN_ASK.test(text) && named(this.actions.shortcut);
+    const open = OPEN_ASK.exec(text);
+    let ask = null;
+    if (shortcut) ask = { kind: 'shortcut', wanted: shortcut };
+    else if (media && this.actions.media.length) ask = { kind: 'media', wanted: media };
+    else if (open) ask = { kind: 'open', wanted: named(this.actions.open) || open[1].replace(/\b(app|please|pls|plz|for me|stp|por favor|пожалуйста)\b|[?!.,]+/gi, ' ').trim() };
+    if (!ask) return;
+    const name = await this.host.findAction(ask.kind, ask.wanted);
+    if (!name || !this.open || this.turn) return;
+    this.panel.setActions(
+      [{ id: 'go', label: this.actionLabel(ask.kind, name), primary: true }, { id: 'no', label: this.t.no }],
+      (id) => (id === 'go' ? this.runAction(ask.kind, name) : this.panel.setActions([])),
+    );
   }
 
   // She was asked to close an app: a button with its name, and nothing happens until you click it.
@@ -263,20 +300,24 @@ export class Chat {
   // each only when you ask and after your click; nothing else.
   powers() {
     const cant = 'you can\'t see the user\'s screen or files, or do anything else on their computer (settings, files, messages): if asked, say plainly that you can\'t, in character, and don\'t pretend to.';
-    const { open, shortcut, media } = this.actions;
+    const { open, shortcut, media, volume } = this.actions;
     const can = [];
     if (this.apps.length) {
       const running = this.apps.map(({ name, label }) => (label && label !== name ? `${name} (${label})` : name)).join(', ');
       can.push(`Close an app that's open: [[close: NAME]], NAME being the exact name from this list (the part before the parentheses): ${running}.`);
     }
-    if (open.length) can.push(`Open an installed app: [[open: NAME]], NAME from: ${open.slice(0, NAMES_MAX).join(', ')}.`);
+    // not the whole list of installed apps: too much for a small model, and the name gets checked anyway
+    if (open.length) can.push('Open an installed app: [[open: NAME]], NAME being the app\'s name, like [[open: Safari]].');
     if (shortcut.length) can.push(`Run one of their Shortcuts: [[shortcut: NAME]], NAME from: ${shortcut.join(', ')}.`);
-    if (media.length) can.push(`Control the music and the volume: [[media: WHAT]], WHAT one of: ${media.join(', ')}.`);
+    if (media.length) {
+      const level = volume ? ', or volume N to set it to N percent, like [[media: volume 30]]' : '';
+      can.push(`Control the music and the volume: [[media: WHAT]], WHAT one of: ${media.join(', ')}${level}.`);
+    }
     if (!can.length) return [`You can't do anything on the user's computer here, and ${cant}`];
     return [
       'What you can do on the user\'s computer, only when they ask you to:',
       ...can,
-      'Then say in a few words that you will, and end your answer with that one tag. They get a button to confirm it, so never say it\'s already done.',
+      'Then say in a few words that you will, and you MUST end your answer with that one tag: without it, nothing happens. They get a button to confirm it, so never say it\'s done, has been done, or is set: it isn\'t yet.',
       `Apart from that, ${cant}`,
     ];
   }

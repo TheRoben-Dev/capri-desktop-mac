@@ -24,14 +24,23 @@ function exec(file, args) {
 
 const simple = (text) => String(text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
-// The name in `names` that `wanted` means: the same, the start of it, or inside it.
+const words = (text) => String(text || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+// "vscode" for Visual Studio Code: the initials, then the last word whole
+function nickname(name) {
+  const w = words(name);
+  return w.length > 1 ? w.slice(0, -1).map((x) => x[0]).join('') + w.at(-1) : '';
+}
+
+// The name in `names` that `wanted` means: the same (or its nickname), the start of it, one of its
+// words ("code" is Visual Studio Code before Xcode), or inside it.
 function match(wanted, names) {
   const key = simple(wanted);
   if (key.length < 2) return null;
   const score = (name) => {
     const n = simple(name);
-    if (n === key) return 3;
-    if (n.startsWith(key) || key.startsWith(n)) return 2;
+    if (n === key || nickname(name) === key) return 4;
+    if (n.startsWith(key) || key.startsWith(n)) return 3;
+    if (key.length >= 3 && words(name).some((w) => w.startsWith(key))) return 2;
     if (key.length >= 3 && (n.includes(key) || key.includes(n))) return 1;
     return 0;
   };
@@ -133,12 +142,13 @@ async function media(arg) {
   return { ok: true };
 }
 
-// What the overlay offers the model: { open: [names], shortcut: [names], media: [args] }
+// What the overlay can offer: { open: [names], shortcut: [names], media: [args], volume: can set a level }
 async function available() {
   return {
     open: [...(await installed()).keys()].sort(),
     shortcut: [...(await shortcuts()).keys()],
-    media: MAC || WIN ? [...MEDIA, ...(MAC ? ['volume 0-100'] : [])] : [],
+    media: MAC || WIN ? MEDIA : [],
+    volume: MAC,
   };
 }
 
