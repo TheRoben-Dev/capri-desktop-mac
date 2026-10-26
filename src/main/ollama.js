@@ -52,10 +52,11 @@ async function info(model) {
       if (!res.ok) throw await failure(res);
       const json = await res.json();
       const size = /([\d.]+)\s*B/i.exec(json.details?.parameter_size || '');
-      return { tools: (json.capabilities || []).includes('tools'), billions: size ? Number(size[1]) : 0 };
+      const can = json.capabilities || [];
+      return { tools: can.includes('tools'), thinking: can.includes('thinking'), billions: size ? Number(size[1]) : 0 };
     })().catch(() => {
       shown.delete(model);
-      return { tools: false, billions: 0 };
+      return { tools: false, thinking: false, billions: 0 };
     }));
   }
   return shown.get(model);
@@ -64,6 +65,8 @@ async function info(model) {
 // Her answer, streamed: onDelta(piece) as it comes, resolves with { text, calls } (calls: the
 // functions from `tools` the model asked to run, if any).
 async function chat({ model, messages, tools, predict = 240 }, onDelta, signal) {
+  // a thinking model (qwen3...) would spend all of num_predict thinking and answer nothing: she answers off the cuff
+  const { thinking } = await info(model);
   const res = await fetch(`${base()}/api/chat`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -73,6 +76,7 @@ async function chat({ model, messages, tools, predict = 240 }, onDelta, signal) 
       stream: true,
       keep_alive: '15m', // she stays loaded while you chat
       ...(tools?.length ? { tools } : {}),
+      ...(thinking ? { think: false } : {}),
       options: { temperature: 0.85, num_predict: predict },
     }),
     signal,

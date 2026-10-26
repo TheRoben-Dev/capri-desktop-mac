@@ -235,7 +235,8 @@ export class Chat {
         return url;
       }
     };
-    const list = sources.slice(0, 3);
+    const sites = new Set();
+    const list = sources.filter((s) => !sites.has(site(s.url)) && sites.add(site(s.url))).slice(0, 3); // one per site
     this.panel.setActions(
       list.map((s, i) => ({ id: String(i), label: `↗ ${site(s.url)}`, primary: i === 0 })),
       (i) => this.host.openSource(list[Number(i)]?.url),

@@ -396,7 +396,7 @@ function registerIpc() {
         overlay?.webContents.send('chat:search', { id, query, engine: search.engine(cfg) });
         try {
           const result = await search.run(query, cfg, abort.signal);
-          for (const r of result.results.slice(0, 3)) {
+          for (const r of result.results) {
             found.push({ title: r.title, url: r.url });
             sources.add(r.url);
           }
