@@ -12,14 +12,18 @@
     "demo": "node scripts/demo.js",
     "hooks:install": "node scripts/install-hooks.js",
     "hooks:uninstall": "node scripts/install-hooks.js --uninstall",
-    "dist": "electron-builder --win"
+    "build:helper": "node scripts/build-mac-helper.js",
+    "postinstall": "node scripts/build-mac-helper.js --optional",
+    "dist": "electron-builder --win",
+    "dist:mac": "npm run build:helper && electron-builder --mac"
   },
   "keywords": [
     "claude-code",
     "desktop-pet",
     "electron",
     "cyberpunk",
-    "edgerunners"
+    "edgerunners",
+    "macos"
   ],
   "license": "MIT",
   "engines": {
@@ -48,9 +52,39 @@
       "hooks/**",
       "src/main/windows.ps1"
     ],
+    "afterPack": "scripts/after-pack.js",
     "win": {
       "target": "nsis",
       "icon": "assets/icons/capri.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "assets/icons/capri-mac.png",
+      "category": "public.app-category.entertainment",
+      "extendInfo": {
+        "LSUIElement": true
+      },
+      "extraResources": [
+        {
+          "from": "native/mac-helper/bin",
+          "to": "bin"
+        }
+      ],
+      "x64ArchFiles": "Contents/Resources/bin/*",
+      "artifactName": "Capri-${version}-mac.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -59,6 +93,9 @@
       "createDesktopShortcut": true,
       "shortcutName": "Capri",
       "artifactName": "Capri-Setup-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "Capri ${version}"
     }
   }
 }

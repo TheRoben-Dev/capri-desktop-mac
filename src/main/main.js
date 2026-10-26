@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const {
   app, BrowserWindow, Tray, Menu, ipcMain, screen, protocol, net, shell, globalShortcut, nativeImage,
-  clipboard, ClipboardItem,
+  clipboard, ClipboardItem, dialog,
 } = require('electron');
 
 const config = require('./config');
@@ -19,6 +19,7 @@ const demoSteps = require('../../scripts/demo-sequence');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DEV = process.argv.includes('--dev');
+const MAC = process.platform === 'darwin';
 const PORT = Number(process.env.CAPRI_PORT) || 47823;
 const SOUND_EXT = /\.(mp3|wav|ogg|m4a)$/i;
 const CLAUDE_CODE_HELP = 'https://code.claude.com/docs/en/quickstart';
@@ -82,7 +83,8 @@ function createOverlay() {
     focusable: false,
     hasShadow: false,
     alwaysOnTop: true,
-    type: process.platform === 'win32' ? 'toolbar' : undefined,
+    // a panel on macOS: it can float over full-screen apps without taking them out of their Space
+    type: process.platform === 'win32' ? 'toolbar' : MAC ? 'panel' : undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload.js'),
@@ -96,6 +98,8 @@ function createOverlay() {
 
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
+  // macOS: she follows you from Space to Space, and over full-screen apps
+  if (MAC) overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
   // always shown: put away, she's still there as her biochip in the corner
   overlay.once('ready-to-show', () => overlay.showInactive());
@@ -138,18 +142,19 @@ function playDemo() {
 }
 
 // During the demo, a little fake terminal for her to sit on and take over (window tracking is
-// Windows only, so only there). Opened without stealing focus; closing it drops her off it.
+// Windows and macOS only, so only there). Opened without stealing focus; closing it drops her off it.
 let demoWin = null;
-const DEMO_TERMINAL = `<body style="margin:0;background:#14101c;color:#8f8aa3;font:13px/1.7 Consolas,monospace;padding:14px 18px">
-<div style="color:#36ff7a">PS C:\\night-city-api&gt; npm test -- gigs</div>
+const DEMO_PROMPT = MAC ? 'night-city-api %' : 'PS C:\\night-city-api&gt;';
+const DEMO_TERMINAL = `<body style="margin:0;background:#14101c;color:#8f8aa3;font:13px/1.7 Menlo,Consolas,monospace;padding:14px 18px">
+<div style="color:#36ff7a">${DEMO_PROMPT} npm test -- gigs</div>
 <div>&nbsp;&nbsp;GET /gigs</div><div style="color:#36ff7a">&nbsp;&nbsp;&nbsp;&nbsp;✓ returns 20 items per page</div>
 <div style="color:#36ff7a">&nbsp;&nbsp;&nbsp;&nbsp;✓ paginates with a cursor</div><div style="color:#36ff7a">&nbsp;&nbsp;&nbsp;&nbsp;✓ rejects a bad cursor</div>
-<div>&nbsp;&nbsp;6 passing (212ms)</div><div style="color:#36ff7a">PS C:\\night-city-api&gt; _</div></body>`;
+<div>&nbsp;&nbsp;6 passing (212ms)</div><div style="color:#36ff7a">${DEMO_PROMPT} _</div></body>`;
 
 function demoWindow(open) {
   demoWin?.destroy();
   demoWin = null;
-  if (!open || process.platform !== 'win32') return false;
+  if (!open || !['win32', 'darwin'].includes(process.platform)) return false;
   const b = overlay.getBounds();
   demoWin = new BrowserWindow({
     x: Math.round(b.x + b.width * 0.5 - 310), y: Math.round(b.y + b.height * 0.42), width: 620, height: 300,
@@ -253,7 +258,7 @@ function rebuildTray() {
       })),
     },
     {
-      label: t.startup,
+      label: MAC ? t.startupMac : t.startup,
       type: 'checkbox',
       checked: app.getLoginItemSettings(loginItemOptions()).openAtLogin,
       click: (item) => app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: item.checked }),
@@ -303,7 +308,8 @@ async function refreshModels() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', 'tray.png'));
+  // macOS: menu bar size (16pt, with its @2x for Retina screens)
+  const icon = nativeImage.createFromPath(path.join(ROOT, 'assets', 'icons', MAC ? 'tray-mac.png' : 'tray.png'));
   tray = new Tray(icon);
   tray.setToolTip('Capri');
   tray.on('click', () => sendCommand('status'));
@@ -370,21 +376,28 @@ function registerIpc() {
   ipcMain.handle('panel:copy', async (_e, rect) => {
     const image = await overlay.webContents.capturePage(rect);
     if (image.isEmpty()) return false;
-    const png = new Blob([image.toPNG()], { type: 'image/png' });
-    await clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    try {
+      const png = new Blob([image.toPNG()], { type: 'image/png' });
+      await clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    } catch {
+      clipboard.writeImage(image);
+    }
     return true;
   });
-  // her guide: where her tray icon is (it lives in the taskbar, off the overlay, hence overlay
-  // coordinates past its edge), and the corner by the clock in case Windows hid it behind the ^
+  // her guide: where her tray icon is (it lives in the taskbar, or the menu bar on macOS, off the
+  // overlay, hence overlay coordinates past its edge), and the corner by the clock in case Windows
+  // hid it behind the ^ (on macOS: the right end of the menu bar, in case the notch hid it)
   ipcMain.handle('guide:tray', () => {
     const o = overlay.getBounds();
     const d = targetDisplay().bounds;
     const b = tray?.getBounds();
     const icon = b && b.width > 0 ? { x: b.x - o.x, y: b.y - o.y, w: b.width, h: b.height } : null;
-    const corner = { x: d.x + d.width - 150 - o.x, y: d.y + d.height - 44 - o.y, w: 140, h: 40 };
+    const corner = MAC
+      ? { x: d.x + d.width - 220 - o.x, y: d.y - o.y, w: 210, h: 24 }
+      : { x: d.x + d.width - 150 - o.x, y: d.y + d.height - 44 - o.y, w: 140, h: 40 };
     return { icon, corner };
   });
-  // her guide: Claude Code's folder (~/.claude) in Explorer, its settings file selected
+  // her guide: Claude Code's folder (~/.claude) in Explorer (Finder on macOS), its settings file selected
   ipcMain.handle('guide:claudeFolder', () => {
     const file = hooks.status().file;
     const dir = path.dirname(file);
@@ -478,6 +491,26 @@ async function debugHandler(route, body) {
   throw new Error('unknown debug route');
 }
 
+// macOS: run from the .dmg or Downloads, the app gets a temporary path, and the hook she writes into
+// Claude Code's settings would point at it. Offer to move her into Applications first.
+async function offerApplicationsFolder() {
+  if (!app.isPackaged || app.isInApplicationsFolder()) return;
+  const { response } = await dialog.showMessageBox({
+    type: 'question',
+    buttons: ['Move to Applications', 'Not now'],
+    defaultId: 0,
+    cancelId: 1,
+    message: 'Move Capri to your Applications folder?',
+    detail: 'Claude Code needs to find her at the same place every time.',
+  });
+  if (response !== 0) return;
+  try {
+    app.moveToApplicationsFolder(); // relaunches her from there
+  } catch (err) {
+    console.error('[capri] move to Applications:', err.message);
+  }
+}
+
 function main() {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -485,8 +518,11 @@ function main() {
   }
   app.on('second-instance', () => sendCommand('status'));
   if (process.platform === 'win32') app.setAppUserModelId('capri.desktop');
+  // macOS: no Dock icon, she lives in the menu bar (the installed app also says so in its Info.plist)
+  if (MAC) app.dock?.hide();
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    if (MAC) await offerApplicationsFolder();
     serveProtocol();
     registerIpc();
     createOverlay();

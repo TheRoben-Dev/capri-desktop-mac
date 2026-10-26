@@ -788,3 +788,43 @@ export const LINES = {
     },
   },
 };
+
+// On macOS: her icon lives in the menu bar, her shortcut reads ⌃⌥C, and it's a Mac, not a PC.
+const MAC_ICON = {
+  fr: {
+    line: 'Mon icône, c’est là-haut, dans la barre des menus.',
+    hidden: 'L’encoche ou un gestionnaire de barre des menus peut la cacher. Sinon, clic droit sur moi : c’est le même menu.',
+  },
+  en: {
+    line: 'My icon is right up there, in the menu bar.',
+    hidden: 'The notch or a menu bar manager can hide it. Or right-click me: same menu.',
+  },
+  es: {
+    line: 'Mi icono está ahí arriba, en la barra de menús.',
+    hidden: 'La muesca o un gestor de la barra de menús puede esconderlo. Si no, clic derecho sobre mí: es el mismo menú.',
+  },
+  pt: {
+    line: 'Meu ícone está lá em cima, na barra de menus.',
+    hidden: 'O notch ou um gerenciador da barra de menus pode escondê-lo. Ou clique direito em mim: é o mesmo menu.',
+  },
+  ru: {
+    line: 'Моя иконка вон там, наверху, в строке меню.',
+    hidden: 'Её может скрыть вырез экрана или менеджер строки меню. Или правый клик по мне — то же меню.',
+  },
+};
+
+function forMac(value) {
+  if (typeof value === 'string') return value.replaceAll('Ctrl+Alt+C', '⌃⌥C').replace(/\bPC\b|ПК/g, 'Mac');
+  if (Array.isArray(value)) return value.map(forMac);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, forMac(v)]));
+  }
+  return value;
+}
+
+if (/Mac/.test(navigator.platform)) {
+  for (const [lang, lines] of Object.entries(LINES)) {
+    LINES[lang] = forMac(lines);
+    Object.assign(LINES[lang].guide.icon, MAC_ICON[lang]);
+  }
+}
