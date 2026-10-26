@@ -317,7 +317,7 @@ export class Chat {
     return [
       'What you can do on the user\'s computer, only when they ask you to:',
       ...can,
-      'Then say in a few words that you will, and you MUST end your answer with that one tag: without it, nothing happens. They get a button to confirm it, so never say it\'s done, has been done, or is set: it isn\'t yet.',
+      'Then say in a few words that you\'re about to (like "One click and Safari\'s up, choom."), and you MUST end your answer with that [[...]] itself, nothing after it: without it, nothing happens. They still have to click a button, so it hasn\'t happened yet: never say it\'s done, paused, set or opened.',
       `Apart from that, ${cant}`,
     ];
   }
@@ -349,7 +349,8 @@ export class Chat {
 function clean(text) {
   return String(text)
     .replace(/<think>[\s\S]*?(<\/think>|$)/g, '')
-    .replace(/\[\[[^\]]*(\]\]|$)/g, '') // her action tag (read from the raw answer, never shown)
+    .replace(/\[\[[\s\S]*$/, '') // her action tag and whatever the model added after it (read from the raw answer, never shown)
+    .replace(/[\s,;:.-]*\btag\b\s*:?\s*\w*\s*$/i, '') // "…, tag: done", a small model talking about the tag
     .replace(/[*_`#]+/g, '')
     .replace(/[ \t]+\n/g, '\n')
     .trim();
