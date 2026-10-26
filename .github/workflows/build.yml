@@ -14,7 +14,8 @@ on:
 
 jobs:
   mac:
-    runs-on: macos-14
+    # Intel runner: the Apple Silicon ones are often out of capacity; it still builds the universal app
+    runs-on: macos-15-intel
     env:
       # signed and notarized when these secrets exist, ad-hoc signed otherwise (scripts/after-pack.js)
       CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
