@@ -85,8 +85,9 @@ vient te chercher quand Claude attend ta permission et part en vrille quand la t
 
 ![Elle s'endort jusqu'à son masque, se réveille, et rangée en bas à gauche](docs/sleep.png)
 
-Le suivi des fenêtres ne marche que sous Windows pour l'instant (un petit script PowerShell lit la position des fenêtres, pas leurs titres ni leur contenu).
-Sur macOS et Linux, elle flotte, dépasse des bords, tombe et se balade quand même.
+Le suivi des fenêtres marche sous Windows et macOS (un petit programme lit la position des fenêtres, pas leurs titres ni
+leur contenu : PowerShell sous Windows, un petit programme Swift sous macOS, donc pas besoin de l'autorisation
+d'enregistrement de l'écran). Sous Linux, elle flotte, dépasse des bords, tombe et se balade quand même.
 
 ### Elle te fait visiter
 
@@ -177,6 +178,19 @@ système. Tu peux en choisir une autre dans son menu.
 Son menu : **clic droit sur elle**. Il est aussi sur son icône, que Windows 11 cache souvent derrière le **^** à côté
 de l'horloge.
 
+### Démarrage rapide (macOS)
+
+1. Télécharge **`Capri-x.y.z-mac.dmg`** depuis la [dernière version](https://github.com/TheRoben-Dev/capri-desktop-mac/releases/latest)
+   (une seule app pour Apple Silicon et Intel, macOS 11 ou plus), ouvre-le et glisse Capri dans **Applications**.
+2. L'app n'est pas notarisée (il faut un compte développeur Apple payant) : la première fois, **clic droit sur Capri ›
+   Ouvrir**, puis **Ouvrir** encore. Si macOS dit qu'elle est endommagée, lance une fois
+   `xattr -dr com.apple.quarantine /Applications/Capri.app` dans le Terminal.
+3. Ensuite, comme sous Windows : **Me brancher**, puis relance Claude Code.
+
+Elle vit dans la **barre des menus** (pas d'icône dans le Dock) : son icône est en haut à droite, sauf si l'encoche ou
+un gestionnaire de barre des menus la cache. Clic droit sur elle : le même menu. **⌃⌥C** (Contrôle+Option+C) la range.
+Elle te suit d'un Space à l'autre et par-dessus les apps en plein écran.
+
 ### C'est quoi Claude Code ? Il le faut ?
 
 [Claude Code](https://code.claude.com/docs/en/quickstart) est l'assistant de code d'Anthropic : dans un terminal, dans
@@ -197,10 +211,14 @@ npm install
 npm start
 ```
 
-Garde ce terminal ouvert tant qu'elle tourne. Pas encore testé sur macOS ni Linux : elle devrait démarrer, mais les tours
-avec les fenêtres (s'asseoir dessus, les posséder, t'afficher la réponse de Claude quand tu es ailleurs) ne marchent que
-sous Windows, et sous Linux le calque transparent marche mieux sous X11 (Wayland a du mal avec les fenêtres qui laissent
-passer les clics).
+Garde ce terminal ouvert tant qu'elle tourne. Sous macOS, `npm install` compile aussi son petit programme pour les
+fenêtres (`native/mac-helper`, en Swift) : il faut Xcode ou ses outils en ligne de commande (`xcode-select --install`).
+Sans lui, elle tourne quand même, mais ne peut ni s'asseoir sur tes fenêtres ni fermer d'apps ; recompile-le avec
+`npm run build:helper`. Pour faire le `.dmg` toi-même : `npm run dist:mac`.
+
+Pas encore testé sous Linux : elle devrait démarrer, mais les tours avec les fenêtres (s'asseoir dessus, les posséder,
+t'afficher la réponse de Claude quand tu es ailleurs) ne marchent que sous Windows et macOS, et le calque transparent
+marche mieux sous X11 (Wayland a du mal avec les fenêtres qui laissent passer les clics).
 
 ### La brancher sur Claude Code à la main
 
@@ -261,7 +279,8 @@ avec ces noms (`.mp3`, `.wav`, `.ogg` ou `.m4a`) :
 
 ## FAQ
 
-- **Mac, Linux ?** Pas encore d'installeur, mais tu peux la lancer depuis le code (voir plus haut).
+- **Mac ?** Oui, voir [Démarrage rapide (macOS)](#démarrage-rapide-macos). Tout y marche, tours avec les fenêtres compris.
+- **Linux ?** Pas encore d'installeur, mais tu peux la lancer depuis le code (voir plus haut).
 - **Téléphone, Android ?** Non, il lui faut un ordinateur.
 - **D'autres assistants (Codex, Cursor, Windsurf, Gemini…) ?** Seulement Claude Code pour l'instant.
 - **Ollama ?** De deux façons. Claude Code qui tourne sur un modèle local via Ollama (`ollama launch claude`) : elle le

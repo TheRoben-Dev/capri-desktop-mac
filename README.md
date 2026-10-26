@@ -81,8 +81,9 @@ comes to find you when Claude needs your permission, and loses it when the job i
 
 ![Asleep down to her mask, waking up, and put away bottom left](docs/sleep.png)
 
-Window tracking is Windows-only for now (a tiny PowerShell helper reads window positions, no titles, no contents).
-On macOS and Linux she still floats, peeks, falls and wanders.
+Window tracking works on Windows and macOS (a tiny helper reads window positions, no titles, no contents: PowerShell
+on Windows, a small Swift program on macOS, so no Screen Recording permission). On Linux she still floats, peeks, falls
+and wanders.
 
 ### She shows you around
 
@@ -164,6 +165,19 @@ own. You can choose another one in her menu.
 
 Her menu: **right-click her**. It's also on her tray icon, which Windows 11 often hides behind the **^** next to the clock.
 
+### Quick start (macOS)
+
+1. Download **`Capri-x.y.z-mac.dmg`** from the [latest release](https://github.com/TheRoben-Dev/capri-desktop-mac/releases/latest)
+   (one app for Apple Silicon and Intel, macOS 11 or newer), open it and drag Capri into **Applications**.
+2. The app isn't notarized (that takes a paid Apple Developer account), so the first time, **right-click Capri › Open**,
+   then **Open** again. If macOS says it's damaged, run `xattr -dr com.apple.quarantine /Applications/Capri.app` in
+   Terminal once.
+3. Same as on Windows from there: **Plug me in**, then restart Claude Code.
+
+She lives in the **menu bar** (no Dock icon): her icon is top right, unless the notch or a menu bar manager hides it.
+Right-clicking her opens the same menu. **⌃⌥C** (Control+Option+C) puts her away. She follows you across Spaces and
+over full-screen apps.
+
 ### What's Claude Code? Do I need it?
 
 [Claude Code](https://code.claude.com/docs/en/quickstart) is Anthropic's coding assistant: in a terminal, in VS Code,
@@ -184,9 +198,14 @@ npm install
 npm start
 ```
 
-Keep that terminal open while she runs. Not tested on macOS or Linux yet: she should start, but the window tricks
-(sitting on your windows, possessing them, showing Claude's answer when you're elsewhere) are Windows-only, and on Linux
-the transparent overlay works best on X11 (Wayland can struggle with click-through windows).
+Keep that terminal open while she runs. On macOS, `npm install` also builds her little window helper
+(`native/mac-helper`, Swift): it needs Xcode or its command line tools (`xcode-select --install`). Without it she
+still runs, but can't sit on your windows or close apps; rebuild it with `npm run build:helper`. To make the `.dmg`
+yourself: `npm run dist:mac`.
+
+Not tested on Linux yet: she should start, but the window tricks (sitting on your windows, possessing them, showing
+Claude's answer when you're elsewhere) are Windows and macOS only, and the transparent overlay works best on X11
+(Wayland can struggle with click-through windows).
 
 ### Hook her up to Claude Code by hand
 
@@ -247,7 +266,8 @@ named like this (`.mp3`, `.wav`, `.ogg` or `.m4a`):
 
 ## FAQ
 
-- **Mac, Linux?** No installer yet, but you can run her from the source (see above).
+- **Mac?** Yes, see [Quick start (macOS)](#quick-start-macos). Everything works there, window tricks included.
+- **Linux?** No installer yet, but you can run her from the source (see above).
 - **Phone, Android?** No, she needs a desktop.
 - **Other assistants (Codex, Cursor, Windsurf, Gemini…)?** Claude Code only for now.
 - **Ollama?** Two ways. Claude Code running on a local model through Ollama (`ollama launch claude`): she sees it like
